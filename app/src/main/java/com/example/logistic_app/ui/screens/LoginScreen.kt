@@ -19,14 +19,42 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.logistic_app.ui.components.AppLogo
 import com.example.logistic_app.ui.theme.*
+import com.example.logistic_app.ui.viewmodel.AuthViewModel
 
 @Composable
-fun LoginScreen(onLoginClick: () -> Unit) {
-    var username by remember { mutableStateOf("") }
+fun LoginScreen(
+    viewModel: AuthViewModel,
+    onLoginSuccess: () -> Unit
+) {
+    var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var showNoAccountDialog by remember { mutableStateOf(false) }
+    
+    val isLoading by viewModel.isLoading
+    val error by viewModel.error
+
+    val isEmailValid = remember(email) {
+        android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
+    }
+
+    if (showNoAccountDialog) {
+        AlertDialog(
+            onDismissRequest = { showNoAccountDialog = false },
+            title = { Text("No Account?") },
+            text = { Text("Please contact the administrator to create an account for you.") },
+            confirmButton = {
+                TextButton(onClick = { showNoAccountDialog = false }) {
+                    Text("OK")
+                }
+            },
+            shape = RoundedCornerShape(16.dp),
+            containerColor = SurfaceWhite
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -65,24 +93,38 @@ fun LoginScreen(onLoginClick: () -> Unit) {
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
                 Text(
-                    "Username",
+                    "Email",
                     style = MaterialTheme.typography.labelLarge,
                     color = TextPrimary,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
                 OutlinedTextField(
-                    value = username,
-                    onValueChange = { username = it },
-                    placeholder = { Text("Enter username", color = TextDisabled) },
+                    value = email,
+                    onValueChange = { email = it },
+                    placeholder = { Text("Enter email", color = TextDisabled) },
                     modifier = Modifier.fillMaxWidth(),
                     leadingIcon = { Icon(Icons.Rounded.Person, contentDescription = null, tint = NavyBlue) },
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        errorTextColor = TextPrimary,
                         focusedBorderColor = NavyBlue,
                         unfocusedBorderColor = Color(0xFFE0E0E0)
                     ),
-                    singleLine = true
+                    singleLine = true,
+                    enabled = !isLoading,
+                    isError = email.isNotEmpty() && !isEmailValid
                 )
+                
+                if (email.isNotEmpty() && !isEmailValid) {
+                    Text(
+                        text = "Invalid email format",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(start = 8.dp, top = 4.dp)
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(20.dp))
 
@@ -110,32 +152,55 @@ fun LoginScreen(onLoginClick: () -> Unit) {
                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        errorTextColor = TextPrimary,
                         focusedBorderColor = NavyBlue,
                         unfocusedBorderColor = Color(0xFFE0E0E0)
                     ),
-                    singleLine = true
+                    singleLine = true,
+                    enabled = !isLoading
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                TextButton(
-                    onClick = { /* TODO */ },
-                    modifier = Modifier.align(Alignment.End)
-                ) {
-                    Text("Forgot Password?", color = NavyBlue, fontWeight = FontWeight.SemiBold)
+                if (error != null) {
+                    Text(
+                        text = error!!,
+                        color = Color.Red,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Button(
-                    onClick = onLoginClick,
+                    onClick = { viewModel.signIn(email, password, onLoginSuccess) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = NavyBlue)
+                    colors = ButtonDefaults.buttonColors(containerColor = NavyBlue),
+                    enabled = !isLoading && isEmailValid && password.isNotBlank()
                 ) {
-                    Text("Login", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    if (isLoading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    } else {
+                        Text("Login", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                TextButton(
+                    onClick = { showNoAccountDialog = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Don't have an account?",
+                        color = NavyBlue,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }
@@ -150,7 +215,7 @@ fun LoginScreen(onLoginClick: () -> Unit) {
                 color = NavyBlue
             )
             Text(
-                text = "AFPLSC 2024",
+                text = "AFPLSC 2026",
                 fontSize = 12.sp,
                 color = TextSecondary,
                 modifier = Modifier.padding(top = 4.dp)

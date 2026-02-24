@@ -1,5 +1,7 @@
 package com.example.logistic_app.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -26,21 +28,34 @@ import androidx.compose.ui.unit.sp
 import com.example.logistic_app.ui.components.MapPlaceholder
 import com.example.logistic_app.ui.components.PhotoUploadBox
 import com.example.logistic_app.ui.theme.*
+import com.example.logistic_app.ui.viewmodel.AuthViewModel
 import com.example.logistic_app.ui.viewmodel.EmergencyStep
 import com.example.logistic_app.ui.viewmodel.EmergencyViewModel
 
 @Composable
 fun EmergencyScreen(
-    viewModel: EmergencyViewModel,
-    onBack: () -> Unit
+    authViewModel: AuthViewModel,
+    emergencyViewModel: EmergencyViewModel,
+    onBack: () -> Unit,
+    onForwardToChat: () -> Unit
 ) {
+    val activeDispatch by authViewModel.activeDispatch.collectAsState()
+    val personnel by authViewModel.personnel.collectAsState()
+    val user by authViewModel.user.collectAsState()
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        emergencyViewModel.onImageSelected(uri)
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.92f))
     ) {
         AnimatedContent(
-            targetState = viewModel.currentStep,
+            targetState = emergencyViewModel.currentStep,
             transitionSpec = {
                 if (targetState == EmergencyStep.SUCCESS) {
                     fadeIn() togetherWith fadeOut()
@@ -58,24 +73,42 @@ fun EmergencyScreen(
                 when (step) {
                     EmergencyStep.SELECTION -> {
                         EmergencySelection(
-                            onSelect = { viewModel.onTypeSelected(it) },
+                            onSelect = { emergencyViewModel.onTypeSelected(it) },
                             onClose = onBack
                         )
                     }
                     EmergencyStep.DETAILS -> {
                         EmergencyDetails(
-                            type = viewModel.selectedType,
-                            description = viewModel.description,
-                            onDescriptionChange = { viewModel.onDescriptionChange(it) },
-                            onReport = { viewModel.transmitEmergency() },
-                            onBack = { viewModel.onBack() }
+                            type = emergencyViewModel.selectedType,
+                            description = emergencyViewModel.description,
+                            onDescriptionChange = { emergencyViewModel.onDescriptionChange(it) },
+                            onReport = { 
+                                val dispatchId = activeDispatch?.id ?: ""
+                                val userId = user?.uid ?: ""
+                                val userName = personnel?.fullName ?: user?.displayName ?: "Personnel"
+                                
+                                emergencyViewModel.transmitEmergency(
+                                    dispatchId = dispatchId,
+                                    userId = userId,
+                                    userName = userName
+                                )
+                            },
+                            onBack = { emergencyViewModel.onBack() },
+                            isLoading = emergencyViewModel.isLoading,
+                            errorMessage = emergencyViewModel.error,
+                            selectedImageUri = emergencyViewModel.selectedImageUri,
+                            onUploadClick = { launcher.launch("image/*") }
                         )
                     }
                     EmergencyStep.SUCCESS -> {
                         EmergencySuccess(
                             onDone = {
-                                viewModel.reset()
+                                emergencyViewModel.reset()
                                 onBack()
+                            },
+                            onChatWithSupport = {
+                                emergencyViewModel.reset()
+                                onForwardToChat()
                             }
                         )
                     }
@@ -150,15 +183,21 @@ fun EmergencyDetails(
     description: String,
     onDescriptionChange: (String) -> Unit,
     onReport: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    isLoading: Boolean,
+    errorMessage: String?,
+    selectedImageUri: android.net.Uri?,
+    onUploadClick: () -> Unit
 ) {
+    val isTic = type == "T.I.C."
+    
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
+            IconButton(onClick = onBack, enabled = !isLoading) {
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = Color.White)
             }
             Text(
@@ -169,7 +208,7 @@ fun EmergencyDetails(
             )
         }
         
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
         
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -183,47 +222,79 @@ fun EmergencyDetails(
                     fontWeight = FontWeight.Black,
                     fontSize = 14.sp
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage,
+                        color = Color.Red,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
                 
                 Text("Detected Location (Auto-Detect)", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
-                Spacer(modifier = Modifier.height(8.dp))
-                MapPlaceholder(modifier = Modifier.height(180.dp), text = "Emergency Coordinates: 9.7489° N, 118.7471° E")
+                Spacer(modifier = Modifier.height(6.dp))
+                MapPlaceholder(modifier = Modifier.height(120.dp), text = "Emergency Coordinates: 9.7489° N, 118.7471° E")
                 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 
-                Text("Situation Description", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
-                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    if (isTic) "Situation Description (Optional)" else "Situation Description", 
+                    fontSize = 12.sp, 
+                    fontWeight = FontWeight.Bold, 
+                    color = TextSecondary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
                 OutlinedTextField(
                     value = description,
                     onValueChange = onDescriptionChange,
-                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                    modifier = Modifier.fillMaxWidth().height(100.dp),
                     placeholder = { Text("Describe the emergency...", color = TextDisabled) },
                     shape = RoundedCornerShape(16.dp),
+                    enabled = !isLoading,
                     colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
                         focusedBorderColor = NavyBlue,
                         unfocusedBorderColor = Color(0xFFE0E0E0)
                     )
                 )
                 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 
-                Text("Visual Evidence", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
-                Spacer(modifier = Modifier.height(8.dp))
-                PhotoUploadBox()
+                Text(
+                    if (isTic) "Visual Evidence (Optional)" else "Visual Evidence", 
+                    fontSize = 12.sp, 
+                    fontWeight = FontWeight.Bold, 
+                    color = TextSecondary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                PhotoUploadBox(
+                    modifier = Modifier.height(120.dp),
+                    selectedImageUri = selectedImageUri,
+                    onClick = onUploadClick
+                )
             }
         }
         
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
         
         Button(
             onClick = onReport, 
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp), 
+                .height(56.dp), 
             shape = RoundedCornerShape(16.dp),
+            enabled = !isLoading,
             colors = ButtonDefaults.buttonColors(containerColor = EmergencyRed)
         ) {
-            Text("TRANSMIT EMERGENCY SIGNAL", fontWeight = FontWeight.Black, fontSize = 16.sp)
+            if (isLoading) {
+                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+            } else {
+                Text("TRANSMIT EMERGENCY SIGNAL", fontWeight = FontWeight.Black, fontSize = 16.sp)
+            }
         }
         
         Spacer(modifier = Modifier.height(24.dp))
@@ -231,7 +302,7 @@ fun EmergencyDetails(
 }
 
 @Composable
-fun EmergencySuccess(onDone: () -> Unit) {
+fun EmergencySuccess(onDone: () -> Unit, onChatWithSupport: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -266,14 +337,29 @@ fun EmergencySuccess(onDone: () -> Unit) {
             textAlign = TextAlign.Center,
             lineHeight = 20.sp
         )
-        Spacer(modifier = Modifier.height(64.dp))
+        Spacer(modifier = Modifier.height(48.dp))
+        
         Button(
+            onClick = onChatWithSupport, 
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp), 
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = NavyBlue, contentColor = Color.White)
+        ) {
+            Text("CHAT WITH SUPPORT", fontWeight = FontWeight.Bold)
+        }
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        OutlinedButton(
             onClick = onDone, 
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp), 
             shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = NavyBlue)
+            colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Transparent, contentColor = Color.White),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.5f))
         ) {
             Text("RETURN TO DASHBOARD", fontWeight = FontWeight.Bold)
         }
