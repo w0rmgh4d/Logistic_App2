@@ -12,18 +12,34 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.logistic_app.ui.theme.*
+import com.example.logistic_app.ui.viewmodel.AuthViewModel
 
 @Composable
-fun ProfileScreen() {
+fun ProfileScreen(
+    viewModel: AuthViewModel,
+    onLogout: () -> Unit
+) {
+    val user by viewModel.user.collectAsState()
+    val personnel by viewModel.personnel.collectAsState()
+    
+    // Extract a display name from email if displayName is null, including last name if possible
+    val displayName = personnel?.fullName ?: user?.displayName ?: user?.email?.substringBefore("@")?.split(".", "_", "-")?.joinToString(" ") { 
+        it.replaceFirstChar { char -> char.uppercase() } 
+    } ?: "User"
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -52,13 +68,13 @@ fun ProfileScreen() {
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "Juan Dela Cruz",
+            text = displayName,
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = TextPrimary
         )
         Text(
-            text = "Senior Logistics Driver",
+            text = personnel?.position ?: "Senior Logistics Driver",
             fontSize = 14.sp,
             color = TextSecondary
         )
@@ -82,13 +98,13 @@ fun ProfileScreen() {
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 
-                ProfileInfoRow(icon = Icons.Default.Badge, label = "Code Name", value = "Gwapito")
+                ProfileInfoRow(icon = Icons.Default.Badge, label = "User ID", value = personnel?.username ?: user?.uid?.take(8) ?: "N/A")
                 HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFFF5F5F5))
                 
-                ProfileInfoRow(icon = Icons.Default.Phone, label = "Mobile Number", value = "+63 992 325 6691")
+                ProfileInfoRow(icon = Icons.Default.Phone, label = "Mobile Number", value = personnel?.contactNo ?: "+63 992 325 6691")
                 HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFFF5F5F5))
                 
-                ProfileInfoRow(icon = Icons.Default.Email, label = "Email Address", value = "j.delacruz@logistic.gov")
+                ProfileInfoRow(icon = Icons.Default.Email, label = "Email Address", value = personnel?.email ?: user?.email ?: "No email set")
             }
         }
 
@@ -96,7 +112,10 @@ fun ProfileScreen() {
 
         // Logout Button
         OutlinedButton(
-            onClick = { /* TODO */ },
+            onClick = { 
+                viewModel.signOut()
+                onLogout()
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -136,5 +155,16 @@ fun ProfileInfoRow(icon: ImageVector, label: String, value: String) {
                 color = TextPrimary
             )
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ProfileScreenPreview() {
+    Logistic_AppTheme {
+        ProfileScreen(
+            viewModel = viewModel(),
+            onLogout = {}
+        )
     }
 }
