@@ -25,6 +25,7 @@ import com.example.logistic_app.navigation.Screen
 import com.example.logistic_app.ui.theme.EmergencyRed
 import com.example.logistic_app.ui.theme.LightGrayBackground
 import com.example.logistic_app.ui.theme.NavyBlue
+import com.example.logistic_app.ui.viewmodel.AuthViewModel
 import com.example.logistic_app.ui.viewmodel.EmergencyViewModel
 
 @Composable
@@ -33,12 +34,22 @@ fun MainScreen() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     
+    val authViewModel: AuthViewModel = viewModel()
     val emergencyViewModel: EmergencyViewModel = viewModel()
+
+    val user by authViewModel.user.collectAsState()
+    val activeDispatch by authViewModel.activeDispatch.collectAsState()
+
+    // Show bottom bar only on main screens and if user is logged in
+    val isMainScreen = (currentRoute == Screen.Dispatch.route || currentRoute == Screen.Profile.route) && user != null
+    
+    // SOS button only appears on main screens when there is an active dispatch and it is accepted (not Pending)
+    val showSosButton = isMainScreen && activeDispatch != null && activeDispatch?.status != "Pending"
 
     Scaffold(
         containerColor = LightGrayBackground,
         bottomBar = {
-            if (currentRoute != Screen.Login.route && currentRoute != Screen.Emergency.route) {
+            if (isMainScreen) {
                 Surface(
                     color = NavyBlue,
                     tonalElevation = 0.dp
@@ -57,7 +68,7 @@ fun MainScreen() {
                             NavigationItem(
                                 icon = Icons.Rounded.LocalShipping,
                                 label = "Dispatch",
-                                isSelected = currentRoute == Screen.Dispatch.route || currentRoute == Screen.DeliveryConfirmation.route,
+                                isSelected = currentRoute == Screen.Dispatch.route,
                                 onClick = { 
                                     if (currentRoute != Screen.Dispatch.route) {
                                         navController.navigate(Screen.Dispatch.route) {
@@ -91,7 +102,7 @@ fun MainScreen() {
             }
         },
         floatingActionButton = {
-            if (currentRoute != Screen.Login.route && currentRoute != Screen.Emergency.route) {
+            if (showSosButton) {
                 FloatingActionButton(
                     onClick = { navController.navigate(Screen.Emergency.route) },
                     containerColor = EmergencyRed,
@@ -114,6 +125,7 @@ fun MainScreen() {
     ) { innerPadding ->
         NavGraph(
             navController = navController,
+            authViewModel = authViewModel,
             emergencyViewModel = emergencyViewModel,
             modifier = Modifier.padding(innerPadding)
         )

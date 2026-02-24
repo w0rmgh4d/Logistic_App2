@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "68027606603",
+    "project_id": "lsu-tracker",
+    "storage_bucket": "lsu-tracker.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:68027606603:android:7d74e775d6cda88ae08fce",
+        "android_client_info": {
+          "package_name": "com.example.logistic_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDEkXKrjRRwRayRyQAQFrS8TDrOXvORdZg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

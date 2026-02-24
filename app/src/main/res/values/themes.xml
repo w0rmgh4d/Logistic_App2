@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <style name="Theme.Logistic_App" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="colorPrimary">@color/navy_blue</item>
+        <item name="android:statusBarColor">@color/navy_blue</item>
+    </style>
 
-    <style name="Theme.Logistic_App" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <!-- Use the inset drawable to prevent the logo from appearing too large/zoomed -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/app_logo_inset</item>
+        <item name="windowSplashScreenBackground">@color/navy_blue</item>
+        <item name="postSplashScreenTheme">@style/Theme.Logistic_App</item>
+    </style>
 </resources>
